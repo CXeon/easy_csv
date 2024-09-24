@@ -2,6 +2,6 @@ package csv
 
 import "encoding/csv"
 
-type CsvClientReader struct {
+type ClientReader struct {
 	r *csv.Reader
 }

@@ -1,6 +1,9 @@
 package csv
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 type testBean struct {
 	Name  string `csv:"name"`
@@ -22,14 +25,14 @@ func TestParseInterface(t *testing.T) {
 		Phone: "1331111",
 	}
 
-	data, err := parseInterface(tb, true)
+	data, err := marshalInterface(tb, true)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	t.Logf("有表头：%v\n", data)
 
-	data, err = parseInterface(tb, false)
+	data, err = marshalInterface(tb, false)
 	if err != nil {
 		t.Error(err)
 		return
@@ -57,17 +60,140 @@ func TestParseInterfaceList(t *testing.T) {
 		},
 	}
 
-	data, err := parseInterfaceList(list, true)
+	data, err := marshalInterfaceList(list, true)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	t.Logf("有表头：%v\n", data)
 
-	data, err = parseInterfaceList(list, false)
+	data, err = marshalInterfaceList(list, false)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	t.Logf("无表头：%v\n", data)
+}
+
+func TestUnmarshal2Interface(t *testing.T) {
+	tb := testBean{}
+	source := []string{
+		"王五",
+		"12",
+		"6年级",
+		"bool",
+		"wangwu@qq.com",
+		"1331111",
+	}
+
+	err := unmarshalOneDSlice(source, &tb)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Logf("interface: %+v\n", tb)
+	return
+
+}
+
+func TestUnmarshal2InterfaceList(t *testing.T) {
+	list := []testBean{}
+	source := [][]string{
+		{
+			"王五",
+			"12",
+			"6年级",
+			"101.1",
+			"wangwu@qq.com",
+			"1331111",
+		},
+		{
+			"李四",
+			"13",
+			"4年级",
+			"105.3",
+			"lisi@qq.com",
+			"22222",
+		},
+	}
+	fmt.Printf("%p\n", &list)
+	err := unmarshalTwoDSlice(source, &list)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fmt.Printf("%p\n", &list)
+	return
+}
+
+func TestUnmarshalOneDSliceWithNames(t *testing.T) {
+
+	names := []string{
+		"Name",
+		"Phone",
+		"Email",
+		"Age",
+		"Grade",
+		"Score",
+	}
+
+	source := []string{
+		"王五",
+		"1331111",
+		"wangwu@qq.com",
+		"12",
+		"6年级",
+		"101.1",
+	}
+
+	tb := testBean{}
+
+	err := unmarshalOneDSliceWithNames(names, source, &tb)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	t.Logf("interface: %+v\n", tb)
+	return
+}
+
+func TestUnmarshalTwoDSliceWithNames(t *testing.T) {
+	list := []testBean{}
+	source := [][]string{
+		{
+			"王五",
+			"1331111",
+			"wangwu@qq.com",
+			"12",
+			"6年级",
+			"101.1",
+		},
+		{
+			"李四",
+			"22222",
+			"lisi@qq.com",
+			"13",
+			"4年级",
+			"105.3",
+		},
+	}
+
+	names := []string{
+		"Name",
+		"Phone",
+		"Email",
+		"Age",
+		"Grade",
+		"Score",
+	}
+
+	fmt.Printf("%p\n", &list)
+	err := unmarshalTwoDSliceWithNames(names, source, &list)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fmt.Printf("%p\n", &list)
+	return
 }

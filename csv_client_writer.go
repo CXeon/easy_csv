@@ -2,60 +2,60 @@ package csv
 
 import (
 	"encoding/csv"
-	"os"
+	"io"
 )
 
-type CsvClientWriter struct {
+type ClientWriter struct {
 	w *csv.Writer
 }
 
-type CsvClientOption struct {
+type ClientWriterOption struct {
 	Comma   rune // Field delimiter (cloud set to ',')
 	UseCRLF bool // True to use \r\n as the line terminator
 }
 
-type CsvClientOptionFunc func(*CsvClientOption)
+type ClientOptionFunc func(*ClientWriterOption)
 
-func NewCsvClientWriter(file *os.File, opts ...CsvClientOptionFunc) *CsvClientWriter {
-	option := &CsvClientOption{}
+func NewCsvClientWriter(writer io.Writer, opts ...ClientOptionFunc) *ClientWriter {
+	option := &ClientWriterOption{}
 	for _, opt := range opts {
 		opt(option)
 	}
 
-	w := csv.NewWriter(file)
+	w := csv.NewWriter(writer)
 	if option.Comma != 0 {
 		w.Comma = option.Comma
 	}
 
 	w.UseCRLF = option.UseCRLF
 
-	return &CsvClientWriter{w: w}
+	return &ClientWriter{w: w}
 }
 
-func WithComma(comma rune) CsvClientOptionFunc {
-	return func(opt *CsvClientOption) {
+func WithComma(comma rune) ClientOptionFunc {
+	return func(opt *ClientWriterOption) {
 		opt.Comma = comma
 	}
 }
 
-func WithUseCRLF(useCRLF bool) CsvClientOptionFunc {
-	return func(opt *CsvClientOption) {
+func WithUseCRLF(useCRLF bool) ClientOptionFunc {
+	return func(opt *ClientWriterOption) {
 		opt.UseCRLF = useCRLF
 	}
 }
 
 // WriteRow2File 将一行数据写入文件中
-func (w *CsvClientWriter) WriteRow2File(data interface{}, setTitle ...bool) error {
+func (writer *ClientWriter) WriteRow2File(data interface{}, setTitle ...bool) error {
 	flag := false
 	if len(setTitle) > 0 {
 		flag = setTitle[0]
 	}
 
-	records, err := parseInterface(data, flag)
+	records, err := marshalInterface(data, flag)
 	if err != nil {
 		return err
 	}
-	err = w.WriteString2File(records)
+	err = writer.WriteString2File(records)
 	if err != nil {
 		return err
 	}
@@ -63,17 +63,17 @@ func (w *CsvClientWriter) WriteRow2File(data interface{}, setTitle ...bool) erro
 }
 
 // WriteRows2File 将多行数据写入文件中
-func (w *CsvClientWriter) WriteRows2File(list interface{}, setTitle ...bool) error {
+func (writer *ClientWriter) WriteRows2File(list interface{}, setTitle ...bool) error {
 	flag := false
 	if len(setTitle) > 0 {
 		flag = setTitle[0]
 	}
 
-	records, err := parseInterfaceList(list, flag)
+	records, err := marshalInterfaceList(list, flag)
 	if err != nil {
 		return err
 	}
-	err = w.WriteString2File(records)
+	err = writer.WriteString2File(records)
 	if err != nil {
 		return err
 	}
@@ -83,11 +83,11 @@ func (w *CsvClientWriter) WriteRows2File(list interface{}, setTitle ...bool) err
 // WriteString2File 向CSV文件中写入文本数据
 //
 // data 切片每个元素代表一行，每行元素还是一个切片，其中每个元素代表一列
-func (w *CsvClientWriter) WriteString2File(data [][]string) error {
-	err := w.w.WriteAll(data)
+func (writer *ClientWriter) WriteString2File(data [][]string) error {
+	err := writer.w.WriteAll(data)
 	if err != nil {
 		return err
 	}
-	w.w.Flush()
+	writer.w.Flush()
 	return nil
 }
