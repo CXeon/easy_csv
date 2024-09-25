@@ -8,10 +8,21 @@ import (
 	"strings"
 )
 
-// 解析结构体的数据到切片
-// bean interface{} 要求必须是结构体类型，不能是指针，每一个field都可以转换成字符串类型
-// setTitle bool 是否在返回的数据中第一行添加表头数据
-func marshalInterface(bean interface{}, setTitle bool) ([][]string, error) {
+// marshal a structure object or a pointer to two-dimensional slice
+// you can set column name in csv file by using struct tag,if not , struct field name will be column name
+// for example :
+//
+//	type bean struct{
+//		Email string  `csv:"邮箱,email_desensitization"`
+//		Phone string  `csv:"手机号,phone_desensitization"`
+//	}
+//
+// 'email_desensitization' will desensitize the email ,and  'phone_desensitization' will desensitize the phone number
+//
+// bean interface{}:  a structure or a pointer of structure，every field of struct should be convertible to type string
+//
+// setTitle bool:  true: the index 0 in result will be set column name
+func marshalStructure(bean interface{}, setTitle bool) ([][]string, error) {
 
 	if bean == nil {
 		return [][]string{}, nil
@@ -20,12 +31,21 @@ func marshalInterface(bean interface{}, setTitle bool) ([][]string, error) {
 	reflectValue := reflect.ValueOf(bean)
 	reflectType := reflectValue.Type()
 
-	//确认bean是结构体类型
-	if reflectType.Kind() != reflect.Struct {
-		return [][]string{}, errors.New("param type interface  must is a structure ")
+	if reflectType.Kind() != reflect.Pointer && reflectType.Kind() != reflect.Struct {
+		return [][]string{}, errors.New("bean must be a struct or a pointer to struct")
+	}
+
+	if reflectType.Kind() == reflect.Pointer {
+		if reflectType.Elem().Kind() != reflect.Struct {
+			return [][]string{}, errors.New("bean must be a pointer to struct")
+		}
 	}
 
 	//strType := reflect.TypeOf("")
+	if reflectValue.Kind() == reflect.Pointer {
+		reflectValue = reflectValue.Elem()
+		reflectType = reflectType.Elem()
+	}
 
 	numField := reflectValue.NumField()
 
@@ -40,7 +60,7 @@ func marshalInterface(bean interface{}, setTitle bool) ([][]string, error) {
 		fieldType := reflectType.Field(i)
 
 		//if !field.CanConvert(strType) {
-		//	return [][]string{}, errors.New("All structure field should be convertible to strings")
+		//	return [][]string{}, errors.New("All structure field should be convertible to type string")
 		//}
 
 		rowData[i] = fmt.Sprint(field.Interface())
@@ -96,10 +116,12 @@ func marshalInterface(bean interface{}, setTitle bool) ([][]string, error) {
 	return [][]string{title, rowData}, nil
 }
 
-// 解析结构体列表到二维切片
-// list interface{} 要求必须是同类型结构体列表，结构体每一个field都可以转换成字符串类型
-// setTitle bool 是否在返回的数据中第一行添加表头数据
-func marshalInterfaceList(list interface{}, setTitle bool) ([][]string, error) {
+// marshal a list to two-dimensional slice,the item of list should be a structure or a pointer of structure
+//
+// list interface{}: any item of list should be a structure or a pointer of structure，every field of struct should be convertible to type string
+//
+// setTitle bool : true: the index 0 in result will be set column name
+func marshalList(list interface{}, setTitle bool) ([][]string, error) {
 	if list == nil {
 		return [][]string{}, nil
 	}
@@ -109,14 +131,27 @@ func marshalInterfaceList(list interface{}, setTitle bool) ([][]string, error) {
 	result := make([][]string, 0)
 
 	reflectListValue := reflect.ValueOf(list)
-	//	reflectListType := reflectListValue.Type()
 
-	if reflectListValue.Kind() != reflect.Slice {
-		return [][]string{}, errors.New("list  type must is slice")
+	if reflectListValue.Kind() != reflect.Slice && reflectListValue.Kind() != reflect.Pointer {
+		return [][]string{}, errors.New("list must be a slice or a pointer to a slice")
+	}
+
+	if reflectListValue.Kind() == reflect.Pointer {
+		if reflectListValue.Elem().Kind() != reflect.Slice {
+			return [][]string{}, errors.New("list must be a slice or a pointer to a slice")
+		}
+	}
+
+	if reflectListValue.Kind() == reflect.Pointer {
+		reflectListValue = reflectListValue.Elem()
 	}
 
 	for i := 0; i < reflectListValue.Len(); i++ {
-		bean := reflectListValue.Index(i).Interface()
+		item := reflectListValue.Index(i)
+		if item.Kind() == reflect.Pointer {
+			item = item.Elem()
+		}
+		bean := item.Interface()
 
 		reflectBeanValue := reflect.ValueOf(bean)
 		reflectBeanType := reflectBeanValue.Type()
@@ -129,12 +164,12 @@ func marshalInterfaceList(list interface{}, setTitle bool) ([][]string, error) {
 			return [][]string{}, errors.New("all list item type must is same")
 		}
 
-		if reflectBeanType.Kind() != reflect.Struct && reflectBeanType.Kind() != reflect.Pointer {
-			return [][]string{}, errors.New("item type must is structure or structure pointer")
+		if reflectBeanType.Kind() != reflect.Struct {
+			return [][]string{}, errors.New("item must be structure or structure pointer")
 		}
 
 		if i == 0 {
-			rows, err := marshalInterface(bean, setTitle)
+			rows, err := marshalStructure(bean, setTitle)
 			if err != nil {
 				return [][]string{}, errors.New(fmt.Sprintf("err:%+v ,invalid row data: %v", err, bean))
 			}
@@ -143,7 +178,7 @@ func marshalInterfaceList(list interface{}, setTitle bool) ([][]string, error) {
 		}
 
 		if i > 0 {
-			rows, err := marshalInterface(bean, false)
+			rows, err := marshalStructure(bean, false)
 			if err != nil {
 				return [][]string{}, errors.New(fmt.Sprintf("err:%+v ,invalid row data: %v", err, bean))
 			}
@@ -155,21 +190,30 @@ func marshalInterfaceList(list interface{}, setTitle bool) ([][]string, error) {
 	return result, nil
 }
 
-// 将字符串数组转换成结构体
+// unmarshal a one-dimensional slice to a pointer of structure.
+// The data of slice will be parsed in the order in which the structure is stored.
 //
-// source 需要处理的数据
-// target 结构体对象指针
+// source []string: a one-dimensional slice
+//
+// target interface{}: a pointer of structure
 func unmarshalOneDSlice(source []string, target interface{}) error {
 
+	if target == nil {
+		return errors.New("target cannot be nil")
+	}
+	if len(source) == 0 {
+		return nil
+	}
+
 	reflectValue := reflect.ValueOf(target)
-	fmt.Println(reflectValue.Kind().String())
-	if reflectValue.Kind() != reflect.Ptr {
-		return errors.New("target must be a structure ptr")
+	if reflectValue.Kind() != reflect.Pointer {
+		return errors.New("target must be a pointer of structure")
 	}
 	sourceLen := len(source)
 	reflectValue = reflectValue.Elem()
-	fmt.Println(reflectValue)
-	fmt.Println(reflectValue.Kind().String())
+	if reflectValue.Kind() != reflect.Struct {
+		return errors.New("target must be a pointer of structure")
+	}
 	fieldNum := reflectValue.NumField()
 
 	for i := 0; i < fieldNum; i++ {
@@ -189,37 +233,39 @@ func unmarshalOneDSlice(source []string, target interface{}) error {
 	return nil
 }
 
-// 将多行数解析到结构体列表
+// unmarshal a two-dimensional slice to a list,the list must be a pointer of list,and the item of list must be a structure or a pointer of a structure.
 //
-// source 多行数据
-// target list指针 list的元素可以是结构体，也可以是结构体指针
+// source [][]string:a two-dimensional slice pointer  of a list
+//
+// target interface{}: a pointer of a list
 func unmarshalTwoDSlice(source [][]string, target interface{}) error {
 	if target == nil {
 		return errors.New("target can't is nil")
 	}
 
+	if len(source) == 0 {
+		return nil
+	}
+
 	reflectPtrValue := reflect.ValueOf(target)
-	fmt.Println(reflectPtrValue.Kind().String())
-	if reflectPtrValue.Kind() != reflect.Ptr {
+	if reflectPtrValue.Kind() != reflect.Pointer {
 		return errors.New("target must be a structure slice ptr")
 	}
 
 	reflectSliValue := reflectPtrValue.Elem()
 
 	reflectSliType := reflectSliValue.Type()
-	fmt.Println(reflectSliType.Kind().String())
+
 	if reflectSliType.Kind() != reflect.Slice {
 		return errors.New("target must be a structure slice ptr")
 	}
 
-	fmt.Println(reflectSliType.Elem())
-	fmt.Println(reflectSliType.Elem().Kind())
-	fmt.Println(reflectSliType.Elem().Kind().String())
 	itemReflectType := reflectSliType.Elem()
+
 	for _, row := range source {
 
 		var subTarget reflect.Value
-		if itemReflectType.Kind() == reflect.Ptr {
+		if itemReflectType.Kind() == reflect.Pointer {
 			subTarget = reflect.New(itemReflectType.Elem())
 		}
 		if itemReflectType.Kind() == reflect.Struct {
@@ -229,7 +275,7 @@ func unmarshalTwoDSlice(source [][]string, target interface{}) error {
 		if subTarget.Kind() == reflect.Invalid {
 			return errors.New("target must be a structure slice ptr")
 		}
-		fmt.Println(subTarget.Kind())
+
 		var err error
 
 		err = unmarshalOneDSlice(row, subTarget.Interface())
@@ -237,7 +283,7 @@ func unmarshalTwoDSlice(source [][]string, target interface{}) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(subTarget.Interface())
+
 		//判断target的每个元素是结构体指针还是结构体
 		if itemReflectType.Kind() == reflect.Ptr {
 			reflectSliValue = reflect.Append(reflectSliValue, subTarget)
@@ -247,14 +293,18 @@ func unmarshalTwoDSlice(source [][]string, target interface{}) error {
 		}
 	}
 	reflectPtrValue.Elem().Set(reflectSliValue)
-	fmt.Printf("%+v\n", reflectSliValue.Interface())
+
 	return nil
 }
 
-// 将字符串数组数据解析到结构体
-// names 结构体field名称
-// source 需要处理的数据
-// target 结构体对象指针
+// unmarshal a one-dimensional slice to a pointer of structure,and names is used to specify the order.
+// The data of slice will be parsed in the order in which the structure is stored.
+//
+// names []string: field names of structure ,the order of source
+//
+// source []string: a one-dimensional slice
+//
+// target interface{}: a pointer of structure
 func unmarshalOneDSliceWithNames(names []string, source []string, target interface{}) error {
 
 	if target == nil {
@@ -296,11 +346,13 @@ func unmarshalOneDSliceWithNames(names []string, source []string, target interfa
 
 }
 
-// 将多行数据解析到结构体列表
+// unmarshal a two-dimensional slice to a list,the list must be a pointer of list,and the item of list must be a structure or a pointer of a structure.
 //
-// names 结构体field名称
-// source 多行数据
-// target list指针 list的元素可以是结构体，也可以是结构体指针
+// names []string: field names of structure ,the order of source
+//
+// source [][]string:a two-dimensional slice pointer  of a list
+//
+// target interface{}: a pointer of a list
 func unmarshalTwoDSliceWithNames(names []string, source [][]string, target interface{}) error {
 
 	if target == nil {
@@ -312,7 +364,6 @@ func unmarshalTwoDSliceWithNames(names []string, source [][]string, target inter
 	}
 
 	reflectPtrValue := reflect.ValueOf(target)
-	fmt.Println(reflectPtrValue.Kind().String())
 	if reflectPtrValue.Kind() != reflect.Ptr {
 		return errors.New("target must be a structure slice ptr")
 	}
@@ -320,7 +371,6 @@ func unmarshalTwoDSliceWithNames(names []string, source [][]string, target inter
 	reflectSliValue := reflectPtrValue.Elem()
 
 	reflectSliType := reflectSliValue.Type()
-	fmt.Println(reflectSliType.Kind().String())
 	if reflectSliType.Kind() != reflect.Slice {
 		return errors.New("target must be a structure slice ptr")
 	}
@@ -339,15 +389,12 @@ func unmarshalTwoDSliceWithNames(names []string, source [][]string, target inter
 			return errors.New("target must be a structure slice ptr")
 		}
 
-		fmt.Println(subTarget.Kind())
 		var err error
-
 		err = unmarshalOneDSliceWithNames(names, row, subTarget.Interface())
 
 		if err != nil {
 			return err
 		}
-		fmt.Println(subTarget.Interface())
 		//判断target的每个元素是结构体指针还是结构体
 		if itemReflectType.Kind() == reflect.Ptr {
 			reflectSliValue = reflect.Append(reflectSliValue, subTarget)
@@ -357,7 +404,6 @@ func unmarshalTwoDSliceWithNames(names []string, source [][]string, target inter
 		}
 	}
 	reflectPtrValue.Elem().Set(reflectSliValue)
-	fmt.Printf("%+v\n", reflectSliValue.Interface())
 	return nil
 }
 

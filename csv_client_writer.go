@@ -14,9 +14,9 @@ type ClientWriterOption struct {
 	UseCRLF bool // True to use \r\n as the line terminator
 }
 
-type ClientOptionFunc func(*ClientWriterOption)
+type ClientWriterOptionFunc func(*ClientWriterOption)
 
-func NewCsvClientWriter(writer io.Writer, opts ...ClientOptionFunc) *ClientWriter {
+func NewCsvClientWriter(writer io.Writer, opts ...ClientWriterOptionFunc) *ClientWriter {
 	option := &ClientWriterOption{}
 	for _, opt := range opts {
 		opt(option)
@@ -32,13 +32,13 @@ func NewCsvClientWriter(writer io.Writer, opts ...ClientOptionFunc) *ClientWrite
 	return &ClientWriter{w: w}
 }
 
-func WithComma(comma rune) ClientOptionFunc {
+func WithWriterComma(comma rune) ClientWriterOptionFunc {
 	return func(opt *ClientWriterOption) {
 		opt.Comma = comma
 	}
 }
 
-func WithUseCRLF(useCRLF bool) ClientOptionFunc {
+func WithWriterUseCRLF(useCRLF bool) ClientWriterOptionFunc {
 	return func(opt *ClientWriterOption) {
 		opt.UseCRLF = useCRLF
 	}
@@ -51,7 +51,7 @@ func (writer *ClientWriter) WriteRow2File(data interface{}, setTitle ...bool) er
 		flag = setTitle[0]
 	}
 
-	records, err := marshalInterface(data, flag)
+	records, err := marshalStructure(data, flag)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (writer *ClientWriter) WriteRows2File(list interface{}, setTitle ...bool) e
 		flag = setTitle[0]
 	}
 
-	records, err := marshalInterfaceList(list, flag)
+	records, err := marshalList(list, flag)
 	if err != nil {
 		return err
 	}
