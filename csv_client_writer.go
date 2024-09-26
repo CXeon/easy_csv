@@ -5,6 +5,7 @@ import (
 	"io"
 )
 
+// ClientWriter a writer client is used to write data to csv
 type ClientWriter struct {
 	w *csv.Writer
 }
@@ -16,7 +17,7 @@ type ClientWriterOption struct {
 
 type ClientWriterOptionFunc func(*ClientWriterOption)
 
-func NewCsvClientWriter(writer io.Writer, opts ...ClientWriterOptionFunc) *ClientWriter {
+func NewClientWriter(writer io.Writer, opts ...ClientWriterOptionFunc) *ClientWriter {
 	option := &ClientWriterOption{}
 	for _, opt := range opts {
 		opt(option)
@@ -44,14 +45,16 @@ func WithWriterUseCRLF(useCRLF bool) ClientWriterOptionFunc {
 	}
 }
 
-// WriteRow2File 将一行数据写入文件中
-func (writer *ClientWriter) WriteRow2File(data interface{}, setTitle ...bool) error {
+// WriteRow2File Write a line of data to a file
+//
+// structure: The parameter data is a structure pointer
+func (writer *ClientWriter) WriteRow2File(structure interface{}, setTitle ...bool) error {
 	flag := false
 	if len(setTitle) > 0 {
 		flag = setTitle[0]
 	}
 
-	records, err := marshalStructure(data, flag)
+	records, err := marshalStructure(structure, flag)
 	if err != nil {
 		return err
 	}
@@ -62,7 +65,9 @@ func (writer *ClientWriter) WriteRow2File(data interface{}, setTitle ...bool) er
 	return nil
 }
 
-// WriteRows2File 将多行数据写入文件中
+// WriteRows2File Write multiple lines of data to a file
+//
+// list: The parameter list is a list pointer,the item of list must be a structure or a structure pointer
 func (writer *ClientWriter) WriteRows2File(list interface{}, setTitle ...bool) error {
 	flag := false
 	if len(setTitle) > 0 {
