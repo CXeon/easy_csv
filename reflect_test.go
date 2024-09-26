@@ -1,4 +1,4 @@
-package easycsv
+package easy_csv
 
 import (
 	"testing"
