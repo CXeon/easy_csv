@@ -1,3 +1,3 @@
-module github.com/CXeon/easy_csv
+module github.com/CXeon/easycsv
 
 go 1.20
