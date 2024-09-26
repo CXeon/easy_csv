@@ -56,7 +56,7 @@ func TestCsvClientWriter(t *testing.T) {
 		Phone: "13322226666",
 	}
 
-	writer := NewCsvClientWriter(csvFile)
+	writer := NewClientWriter(csvFile)
 	err = writer.WriteRows2File(list, true)
 	if err != nil {
 		t.Error(err)
