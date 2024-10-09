@@ -6,7 +6,7 @@ The easy_csv package is used to marshal or unmarshal csv file data.
 Installation
 ===
 
-```go get -u github.com/CXeon/easy_csv```  
+```go get -u github.com/CXeon/easy_csv@v1.0.1```  
 
 Full example
 ===
